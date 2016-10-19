@@ -19,7 +19,7 @@ function Get-Amex{
 }
 
 #Array of strings to match
-$LiteralStrings = @("account" , "medical" , "driver" , "patient" , "maiden" , "birth" , "password" , "username")
+$LiteralStrings = @("account" , "medical" , "driver" , "patient" , "maiden" , "birth" , "password" , "username" , "social" , "credit" , "Passport")
 
 #Function that finds indicator of PII
 function Find-Indicators{
