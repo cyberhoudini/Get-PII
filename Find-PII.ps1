@@ -22,31 +22,65 @@ $LiteralStrings = @("account" , "medical" , "driver" , "patient" , "maiden" , "b
 
 #Function that finds indicator of PII
 function Find-Indicators{
-    foreach($n in $LiteralStrings){
-        Get-childitem -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string -AllMatches $n
+        #function that parses through text files
+        function textfiles{
+        foreach($n in $LiteralStrings){
+            Get-childitem -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string -AllMatches $n
+        }
     }
+        #function to parse through word files
+        function wordfiles{
+                $files = Get-Childitem $path .\* -Force -Include *.docx,*.doc -Recurse | Where-Object { !($_.psiscontainer) }
 
-            $files    = Get-Childitem $path .\* -Force -Include *.docx,*.doc -Recurse | Where-Object { !($_.psiscontainer) }
-
-            # Loop through all *.doc files in the $path directory
-            Foreach ($file In $files){
-                $application = New-Object -com word.application
-                $application.visible = $False
-                $document = $application.documents.open($file.FullName,$false,$true)
-                $range = $document.content
-                foreach($n in $LiteralStrings){
-                    If($document.content.text -like "*$n*"){ 
-                        Write-Host "[+] Located File with possible indicator"
-                        Write-Host "[+]" $file
-                        Write-Host "[+] Indicator =" $n
+                # Loop through all *.doc files in the $path directory
+                Foreach ($file In $files){
+                    $application = New-Object -com word.application
+                    $application.visible = $False
+                    $document = $application.documents.open($file.FullName,$false,$true)
+                    $range = $document.content
+                    foreach($n in $LiteralStrings){
+                        If($document.content.text -like "*$n*"){ 
+                        Write-Host "[+][+] Located File With Possible Indicator [+][+]" -foregroundcolor "yellow"
+                        Write-Host "[+]" $file -foregroundcolor "green"
+                        Write-Host "[+] Indicator =" $n -foregroundcolor "red"
+                    }
                 }
+                    $document.close()
+                    $application.quit()
+                    [System.Runtime.Interopservices.Marshal]::ReleaseComObject($document) 
+                    [System.Runtime.Interopservices.Marshal]::ReleaseComObject($application) 
             }
+        }
+
+        function exelfiles{
+            $files = Get-Childitem $path .\* -Force -Include *.xls,*.xlsm,*.xlsx -Recurse | Where-Object { !($_.psiscontainer) }
+            foreach ($file in $files){
+                $application = New-Object -com excel.application
+                $application.visible = $false
+                $range = $document.content
+                $document = $application.workbooks.open($file.FullName,$false,$true)
+                foreach ($n in $LiteralStrings){
+                    if([bool]$application.Cells.Find("*$n*")){
+                        Write-Host "[+][+] Located File With Possible Indicator [+][+]" -foregroundcolor "yellow"
+                        Write-Host "[+]" $file -foregroundcolor "green"
+                        Write-Host "[+] Indicator =" $n -foregroundcolor "red"
+                    }
+
+                }
                 $document.close()
                 $application.quit()
                 [System.Runtime.Interopservices.Marshal]::ReleaseComObject($document) 
-                [System.Runtime.Interopservices.Marshal]::ReleaseComObject($application) 
+                [System.Runtime.Interopservices.Marshal]::ReleaseComObject($application)
+
+            }
+            
+
+
         }
-    }
+textfiles
+wordfiles
+exelfiles
+}
 
 
 
