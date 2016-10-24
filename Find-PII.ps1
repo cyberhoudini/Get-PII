@@ -1,33 +1,28 @@
 
-# This will search for Social Security Numbers
-function Get-SSN {
-    Get-ChildItem  -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string "[0-9]{9}" , "[0-9]{3}[-| ][0-9]{2}[-| ][0-9]{4}"
-}
-# This will search for Credit Card data: Discover, MasterCard, Visa
-function Get-CCards {
-    Get-ChildItem  -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string "[456][0-9]{3}[-| ][0-9]{4}[-| ][0-9]{4}[-| ][0-9]{4}" 
-    Get-ChildItem  -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string "[456][0-9]{15}"
-}
-
-
-#American Express
-function Get-Amex{
-    Get-childitem -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string "3[47][0-9]{4}[-| ][0-9]{6}[-| ][0-9]{5}"
-    Get-childitem -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string "3[47][0-9]{2}[-| ][0-9]{4}[-| ][0-9]{4}[-| ][0-9]{3}"
-    Get-ChildItem -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string "3[47][0-9]{13}","3[47][0-9]{2}[-| ][0-9]{6}[-| ][0-9]{5}"
-}
-
-#Array of strings to match
+#Strings of indicators array
 $LiteralStrings = @("account" , "medical" , "driver" , "patient" , "maiden" , "birth" , "password" , "username", "social", "credit", "passport")
+#Social Security Numbers regex array
+$ssn = @("[0-9]{9}" , "[0-9]{3}[-| ][0-9]{2}[-| ][0-9]{4}")
+#crdit card numbers regex array
+$creditnumbers = @("[456][0-9]{3}[-| ][0-9]{4}[-| ][0-9]{4}[-| ][0-9]{4}" , "[456][0-9]{15}" , "3[47][0-9]{4}[-| ][0-9]{6}[-| ][0-9]{5}" , "3[47][0-9]{2}[-| ][0-9]{4}[-| ][0-9]{4}[-| ][0-9]{3}" , "3[47][0-9]{13}" , "3[47][0-9]{2}[-| ][0-9]{6}[-| ][0-9]{5}")
 
 #Function that finds indicator of PII
 function Find-Indicators{
         #function that parses through text files
         function textfiles{
-        foreach($n in $LiteralStrings){
-            Get-childitem -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string -AllMatches $n
+            foreach($n in $LiteralStrings){
+                Get-childitem -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string -AllMatches "$n"
+
+            }
+            foreach ($n in $creditnumbers){
+                Get-ChildItem -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string $n
+            }
+            foreach ($n in $ssn){
+                $results = Get-ChildItem -rec | ?{ findstr.exe /mprc:. $_.FullName } | select-string $n
+            }
+            
+        
         }
-    }
         #function to parse through word files
         function wordfiles{
                 $files = Get-Childitem $path .\* -Force -Include *.docx,*.doc -Recurse | Where-Object { !($_.psiscontainer) }
@@ -45,6 +40,18 @@ function Find-Indicators{
                         Write-Host "[+] Indicator =" $n -foregroundcolor "red"
                     }
                 }
+                foreach ($x in $ssn){   
+                    if($document.content.text -match "$x"){
+                    Write-Host "[+][+] Found Possible Social Security Number [+][+]" -foregroundcolor "yellow"
+                    Write-Host "[+]" $file -foregroundcolor "green" 
+                    }
+                }
+                foreach ($x in $creditnumbers){   
+                    if($document.content.text -match "$x"){
+                    Write-Host "[+][+] Found Possible Credit Card Number [+][+]" -foregroundcolor "yellow"
+                    Write-Host "[+]" $file -foregroundcolor "green" 
+                    }
+                }
                     $document.close()
                     $application.quit()
                     [System.Runtime.Interopservices.Marshal]::ReleaseComObject($document) 
@@ -52,31 +59,44 @@ function Find-Indicators{
             }
         }
 
+
         function exelfiles{
             $files = Get-Childitem $path .\* -Force -Include *.xls,*.xlsm,*.xlsx -Recurse | Where-Object { !($_.psiscontainer) }
             foreach ($file in $files){
                 $application = New-Object -com excel.application
                 $application.visible = $false
-                $range = $document.content
                 $document = $application.workbooks.open($file.FullName,$false,$true)
+                $range = $document.content
                 foreach ($n in $LiteralStrings){
                     if([bool]$application.Cells.Find("*$n*")){
                         Write-Host "[+][+] Located File With Possible Indicator [+][+]" -foregroundcolor "yellow"
                         Write-Host "[+]" $file -foregroundcolor "green"
                         Write-Host "[+] Indicator =" $n -foregroundcolor "red"
                     }
-
                 }
+
+                foreach ($x in $ssn){   
+                    if($application.value.compareto("$x")){
+                    Write-Host "[+][+] Found Possible Social Security Numbers [+][+]" -foregroundcolor "yellow"
+                    Write-Host "[+]" $file -foregroundcolor "green" 
+                    }
+                }
+                foreach ($x in $creditnumbers){   
+                if($application.value.compareto("$x")){
+                Write-Host "[+][+] Found Possible Credit Card Numbers [+][+]" -foregroundcolor "yellow" 
+                Write-Host "[+]" $file -foregroundcolor "green"
+                }
+            }
+                
                 $document.close()
                 $application.quit()
                 [System.Runtime.Interopservices.Marshal]::ReleaseComObject($document) 
                 [System.Runtime.Interopservices.Marshal]::ReleaseComObject($application)
 
             }
-            
-
-
         }
+    
+
 textfiles
 wordfiles
 exelfiles
